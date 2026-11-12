@@ -11,3 +11,445 @@ apt install -y openssh-client python3 python3-pip
 
 pip3 install netmiko pyyaml ciscoconfparse
 python3 -c "import netmiko; print(netmiko.__version__)"
+
+
+#Creacion del archivo de reglas
+
+cat > reglas.yaml <<'EOF'
+cisco_ios:
+- id: 1.4.1
+  titulo: Enable secret configurado
+  cis: 1.4.1
+  cmd: show running-config
+  tipo: presente
+  regex: ^enable secret
+  fix:
+  - enable secret EnableClave123
+- id: 1.4.2
+  titulo: service password-encryption
+  cis: 1.4.2
+  cmd: show running-config
+  tipo: presente
+  regex: ^service password-encryption
+  fix:
+  - service password-encryption
+- id: 1.4.3
+  titulo: Usuarios locales con secret (sin password en claro)
+  cis: 1.4.3
+  cmd: show running-config
+  tipo: ausente
+  regex: ^username \S+( privilege \d+)? password
+- id: 1.2.2
+  titulo: transport input ssh en line vty
+  cis: 1.2.2
+  cmd: show running-config
+  seccion: line vty
+  tipo: presente
+  regex: ^\s*transport input ssh\s*$
+  fix:
+  - line vty 0 4
+  - transport input ssh
+- id: 1.2.7
+  titulo: exec-timeout <= 10 min en line console 0
+  cis: 1.2.7
+  cmd: show running-config all
+  seccion: line con 0
+  tipo: presente
+  regex: ^\s*exec-timeout\s+((10\s+0\s*$)|([0-9]\s+([0-9]\s*$|[1-5][0-9]\s*$)))
+  fix:
+  - line con 0
+  - exec-timeout 5 0
+- id: 1.2.8
+  titulo: exec-timeout <= 10 min en line vty
+  cis: 1.2.8
+  cmd: show running-config all
+  seccion: line vty
+  tipo: presente
+  regex: ^\s*exec-timeout\s+((10\s+0\s*$)|([0-9]\s+([0-9]\s*$|[1-5][0-9]\s*$)))
+  fix:
+  - line vty 0 4
+  - exec-timeout 5 0
+- id: 1.2.11
+  titulo: Bloqueo 15 min tras 3 intentos fallidos
+  cis: 1.2.11
+  cmd: show running-config
+  tipo: presente
+  regex: ^login block-for 900 attempts 3 within 120
+  fix:
+  - login block-for 900 attempts 3 within 120
+- id: 1.3.2
+  titulo: Banner login con texto de aviso
+  cis: 1.3.2
+  cmd: show running-config
+  tipo: presente
+  regex: ^banner login .*autorizado
+  fix:
+  - 'banner login #Acceso restringido: solo personal autorizado. Toda actividad se
+    registra.#'
+- id: 2.1.1.1.4
+  titulo: ip ssh time-out <= 60 segundos
+  cis: 2.1.1.1.4
+  cmd: show ip ssh
+  tipo: presente
+  regex: Authentication timeout:\s*([1-9]|[1-5][0-9]|60)\s*secs
+  fix:
+  - ip ssh time-out 60
+- id: 2.1.1.1.5
+  titulo: ip ssh authentication-retries <= 3
+  cis: 2.1.1.1.5
+  cmd: show ip ssh
+  tipo: presente
+  regex: Authentication retries:\s*[1-3]\b
+  fix:
+  - ip ssh authentication-retries 3
+- id: 2.1.1.2
+  titulo: SSH version 2
+  cis: 2.1.1.2
+  cmd: show ip ssh
+  tipo: presente
+  regex: SSH Enabled - version 2\.0
+  fix:
+  - ip ssh version 2
+- id: 2.1.2
+  titulo: CDP deshabilitado (no cdp run)
+  cis: 2.1.2
+  cmd: show running-config
+  tipo: presente
+  regex: ^no cdp run
+  fix:
+  - no cdp run
+- id: 2.1.3
+  titulo: BOOTP server deshabilitado
+  cis: 2.1.3
+  cmd: show running-config
+  tipo: ausente
+  regex: ^ip bootp server
+  fix:
+  - no ip bootp server
+- id: 2.1.4
+  titulo: service tcp-keepalives-in
+  cis: 2.1.4
+  cmd: show running-config
+  tipo: presente
+  regex: ^service tcp-keepalives-in
+  fix:
+  - service tcp-keepalives-in
+- id: 2.1.5
+  titulo: service tcp-keepalives-out
+  cis: 2.1.5
+  cmd: show running-config
+  tipo: presente
+  regex: ^service tcp-keepalives-out
+  fix:
+  - service tcp-keepalives-out
+- id: 2.1.6
+  titulo: PAD deshabilitado (no service pad)
+  cis: 2.1.6
+  cmd: show running-config all
+  tipo: ausente
+  regex: ^service pad
+  fix:
+  - no service pad
+- id: 2.2.2
+  titulo: logging buffered con tamaño configurado
+  cis: 2.2.2
+  cmd: show running-config
+  tipo: presente
+  regex: ^logging buffered
+  fix:
+  - logging buffered 64000
+- id: 2.2.3
+  titulo: logging console critical
+  cis: 2.2.3
+  cmd: show running-config
+  tipo: presente
+  regex: ^logging console critical
+  fix:
+  - logging console critical
+- id: 2.2.6
+  titulo: service timestamps debug datetime
+  cis: 2.2.6
+  cmd: show running-config
+  tipo: presente
+  regex: ^service timestamps debug datetime
+  fix:
+  - service timestamps debug datetime msec show-timezone
+- id: 2.2.8a
+  titulo: login on-failure log
+  cis: 2.2.8
+  cmd: show running-config
+  tipo: presente
+  regex: ^login on-failure log
+  fix:
+  - login on-failure log
+- id: 2.2.8b
+  titulo: login on-success log
+  cis: 2.2.8
+  cmd: show running-config
+  tipo: presente
+  regex: ^login on-success log
+  fix:
+  - login on-success log
+- id: 3.1.1
+  titulo: no ip source-route
+  cis: 3.1.1
+  cmd: show running-config
+  tipo: presente
+  regex: ^no ip source-route
+  fix:
+  - no ip source-route
+fortinet:
+- id: 2.1.1
+  titulo: Pre-login banner habilitado
+  cis: 2.1.1
+  cmd: get system global
+  tipo: presente
+  regex: pre-login-banner\s*:\s*enable
+  fix:
+  - config system global
+  - set pre-login-banner enable
+  - end
+- id: 2.2.1
+  titulo: Password policy habilitada
+  cis: 2.2.1
+  cmd: get system password-policy
+  tipo: presente
+  regex: status\s*:\s*enable
+  fix:
+  - config system password-policy
+  - set status enable
+  - set minimum-length 8
+  - set min-lower-case-letter 1
+  - set min-upper-case-letter 1
+  - set min-non-alphanumeric 1
+  - set min-number 1
+  - end
+- id: 2.2.2a
+  titulo: admin-lockout-threshold = 3
+  cis: 2.2.2
+  cmd: get system global
+  tipo: presente
+  regex: admin-lockout-threshold\s*:\s*3\s*$
+  fix:
+  - config system global
+  - set admin-lockout-threshold 3
+  - end
+- id: 2.2.2b
+  titulo: admin-lockout-duration = 900
+  cis: 2.2.2
+  cmd: get system global
+  tipo: presente
+  regex: admin-lockout-duration\s*:\s*900\s*$
+  fix:
+  - config system global
+  - set admin-lockout-duration 900
+  - end
+- id: 2.4.4
+  titulo: Idle timeout de administrador configurado (5 min)
+  cis: 2.4.4
+  cmd: get system global
+  tipo: presente
+  regex: admintimeout\s*:\s*[1-5]\s*$
+  fix:
+  - config system global
+  - set admintimeout 5
+  - end
+- id: 2.4.5
+  titulo: Solo canales cifrados (sin http ni telnet en interfaces)
+  cis: 2.4.5
+  cmd: show system interface
+  tipo: ausente
+  regex: allowaccess[^\n]*\b(http|telnet)\b
+  fix:
+  - config system interface
+  - edit port2
+  - unselect allowaccess http
+  - next
+  - end
+- id: '3.2'
+  titulo: Politicas sin "ALL" como servicio
+  cis: '3.2'
+  cmd: show firewall policy
+  tipo: ausente
+  regex: set service "ALL"
+- id: 2.1.8
+  titulo: Static keys para TLS deshabilitadas
+  cis: 2.1.8
+  cmd: get system global
+  tipo: presente
+  regex: ssl-static-key-ciphers\s*:\s*disable
+  fix:
+  - config system global
+  - set ssl-static-key-ciphers disable
+  - end
+EOF
+
+
+
+#Creacion del archivo auditor
+
+cat > auditor.py <<'EOF'
+#!/usr/bin/env python3
+import argparse, csv, datetime, os, re, yaml
+from netmiko import ConnectHandler
+
+def cargar(ruta):
+    with open(ruta) as f:
+        return yaml.safe_load(f)
+
+def seccion(texto, nombre):
+    salida, dentro = [], False
+    for linea in texto.splitlines():
+        if linea.startswith(nombre):
+            dentro = True
+            salida.append(linea)
+        elif dentro and linea.startswith(" "):
+            salida.append(linea)
+        else:
+            dentro = False
+    return "\n".join(salida)
+
+def cumple(regla, texto):
+    if "seccion" in regla:
+        texto = seccion(texto, regla["seccion"])
+    hallado = re.search(regla["regex"], texto, re.M) is not None
+    return (not hallado) if regla["tipo"] == "ausente" else hallado
+
+def aplicables(reglas, dev):
+    return [r for r in reglas if "solo" not in r or dev["nombre"] in r["solo"]]
+
+def evaluar(conn, reglas):
+    cache, res = {}, {}
+    for r in reglas:
+        if r["cmd"] not in cache:
+            cache[r["cmd"]] = conn.send_command(r["cmd"], read_timeout=90)
+        res[r["id"]] = cumple(r, cache[r["cmd"]])
+    return res
+
+def guardar_config(conn, dev, salida, etiqueta):
+    cmd = "show running-config" if dev["device_type"] == "cisco_ios" else "show full-configuration"
+    os.makedirs(os.path.join(salida, "configs"), exist_ok=True)
+    with open(os.path.join(salida, "configs", f"{dev['nombre']}_{etiqueta}.txt"), "w") as f:
+        f.write(conn.send_command(cmd, read_timeout=90))
+
+def procesar(dev, reglas, salida, aplicar):
+    conn = ConnectHandler(device_type=dev["device_type"], host=dev["host"],
+                          username=dev["username"], password=dev["password"],
+                          conn_timeout=30)
+    reglas = aplicables(reglas, dev)
+    guardar_config(conn, dev, salida, "antes")
+    antes = evaluar(conn, reglas)
+    despues = {}
+    if aplicar:
+        for r in reglas:
+            if not antes[r["id"]] and r.get("fix"):
+                conn.send_config_set(r["fix"])
+        if dev["device_type"] == "cisco_ios":
+            conn.save_config()
+        guardar_config(conn, dev, salida, "despues")
+        despues = evaluar(conn, reglas)
+    conn.disconnect()
+    filas = []
+    for r in reglas:
+        a = "CUMPLE" if antes[r["id"]] else "NO CUMPLE"
+        if aplicar:
+            d = "CUMPLE" if despues[r["id"]] else "NO CUMPLE"
+            accion = "Aplicada" if (not antes[r["id"]] and despues[r["id"]]) else \
+                     ("Sin cambio" if antes[r["id"]] else "FALLO al aplicar")
+        else:
+            d, accion = "-", "-"
+        filas.append((dev["nombre"], r["id"], r["titulo"], r.get("cis", ""), a, d, accion))
+    return filas
+
+def main():
+    p = argparse.ArgumentParser(description="Auditor de hardening (CIS)")
+    p.add_argument("--modo", choices=["audit", "apply"], default="audit")
+    p.add_argument("--dispositivos", default="dispositivos.yaml")
+    p.add_argument("--reglas", default="reglas.yaml")
+    p.add_argument("--salida", default="salida")
+    a = p.parse_args()
+
+    reglas = cargar(a.reglas)
+    todos = []
+    for dev in cargar(a.dispositivos):
+        try:
+            todos += procesar(dev, reglas[dev["device_type"]], a.salida, a.modo == "apply")
+        except Exception as e:
+            todos.append((dev["nombre"], "-", "Error de conexion", "", f"ERROR: {e}", "-", "-"))
+
+    os.makedirs(a.salida, exist_ok=True)
+    marca = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    base = os.path.join(a.salida, f"informe_{a.modo}_{marca}")
+    cab = ["Dispositivo", "ID", "Recomendacion", "CIS", "Antes", "Despues", "Accion"]
+    with open(base + ".csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(cab)
+        w.writerows(todos)
+    with open(base + ".md", "w") as f:
+        f.write(f"# Informe de hardening (modo {a.modo})\n\n")
+        f.write("| " + " | ".join(cab) + " |\n|" + "---|" * len(cab) + "\n")
+        for fila in todos:
+            f.write("| " + " | ".join(fila) + " |\n")
+    for d in sorted({x[0] for x in todos}):
+        filas = [x for x in todos if x[0] == d and x[1] != "-"]
+        ok = sum(1 for x in filas if x[4] == "CUMPLE")
+        linea = f"{d}: {ok}/{len(filas)} cumplen"
+        if a.modo == "apply":
+            ok2 = sum(1 for x in filas if x[5] == "CUMPLE")
+            linea += f" -> {ok2}/{len(filas)} tras aplicar"
+        print(linea)
+    print("Informe:", base + ".md")
+
+if __name__ == "__main__":
+    main()
+EOF
+
+
+# Creacion de los archivos de dispositivos (No se muestran las contraseñas por motivos de seguridad)
+
+cat > dispositivos.yaml <<'EOF'
+- device_type: cisco_ios
+  host: 14.10.10.1
+  nombre: R1
+  password: CAMBIAR
+  username: auditor
+- device_type: cisco_ios
+  host: 14.10.10.3
+  nombre: SW1
+  password: CAMBIAR
+  username: auditor
+- device_type: fortinet
+  host: 14.10.10.4
+  nombre: FGT
+  password: CAMBIAR
+  username: auditor
+EOF
+
+cat > dispositivos_cisco.yaml <<'EOF'
+- device_type: cisco_ios
+  host: 14.10.10.1
+  nombre: R1
+  password: CAMBIAR
+  username: auditor
+- device_type: cisco_ios
+  host: 14.10.10.3
+  nombre: SW1
+  password: CAMBIAR
+  username: auditor
+EOF
+
+cat > dispositivos_fgt.yaml <<'EOF'
+- device_type: fortinet
+  host: 14.10.10.4
+  nombre: FGT
+  password: CAMBIAR
+  username: auditor
+EOF
+
+
+
+python3 auditor.py --modo audit --salida salida_antes
+cat "$(ls -t salida_antes/informe_audit_*.md | head -1)"
+
+python3 auditor.py --modo apply --salida salida_apply
+cat "$(ls -t ~/hardening/salida_apply/informe_apply_*.md | head -1)"
